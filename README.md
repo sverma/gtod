@@ -2,30 +2,58 @@
 
 A minimal HTTP service for exercising CI/CD pipelines and GitOps delivery. It exposes the current time in several formats.
 
-## Endpoints
+## Primary API
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/` | Current date/time in UTC as ISO-8601 (RFC3339) |
-| `GET` | `/epoch` | Current UTC date/time (ISO-8601) and Unix epoch seconds |
-| `GET` | `/TZ/{tz...}` | Current date/time in the given [IANA timezone](https://en.wikipedia.org/wiki/List_of_tz_database_time_zones). Use a path with slashes, e.g. `/TZ/Europe/London` |
+| `GET` | `/time` | Current time (default: UTC, ISO-8601 / RFC3339) |
 
-All successful responses are JSON with `Content-Type: application/json`.
+### Query parameters
+
+| Parameter | Default | Values | Description |
+|-----------|---------|--------|-------------|
+| `tz` | `UTC` | IANA timezone name | e.g. `Europe/London`, `America/New_York` |
+| `format` | `iso` | `iso`, `rfc3339`, `unix`, `epoch` | `unix` or `epoch` adds `"epoch"` (Unix seconds) to the JSON |
+
+All successful responses use the same JSON shape:
+
+```json
+{"datetime":"2026-06-03T14:30:45Z","timezone":"UTC"}
+```
+
+With `format=unix` (or `format=epoch`):
+
+```json
+{"datetime":"2026-06-03T14:30:45Z","timezone":"UTC","epoch":1748958645}
+```
 
 ### Examples
 
 ```bash
-curl -s http://localhost:8080/
+curl -s http://localhost:8080/time
 # {"datetime":"2026-06-03T14:30:45Z","timezone":"UTC"}
 
-curl -s http://localhost:8080/epoch
-# {"datetime":"2026-06-03T14:30:45Z","epoch":1748958645,"timezone":"UTC"}
+curl -s "http://localhost:8080/time?format=unix"
+# {"datetime":"...","timezone":"UTC","epoch":1748958645}
 
-curl -s http://localhost:8080/TZ/Asia/Tokyo
+curl -s "http://localhost:8080/time?tz=Asia/Tokyo"
 # {"datetime":"2026-06-03T23:30:45+09:00","timezone":"Asia/Tokyo"}
+
+curl -s "http://localhost:8080/time?format=unix&tz=Europe/London"
+# {"datetime":"...","timezone":"Europe/London","epoch":...}
 ```
 
-Invalid timezones return `400` with `{"error":"invalid timezone: ..."}`.
+Invalid `tz` or `format` values return `400` with `{"error":"..."}`.
+
+## Deprecated routes (backward compatible)
+
+These routes still work but return `Deprecation: true` and `Link: </time>; rel="successor-version"`. Prefer `/time` with query parameters.
+
+| Legacy path | Replacement |
+|-------------|-------------|
+| `GET /` | `GET /time` |
+| `GET /epoch` | `GET /time?format=unix` |
+| `GET /TZ/{tz...}` | `GET /time?tz={tz}` (e.g. `/time?tz=Europe/London`) |
 
 ## Requirements
 

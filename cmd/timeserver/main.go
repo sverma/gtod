@@ -16,9 +16,10 @@ func main() {
 
 	h := timeapi.NewHandler()
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /time", h.Time)
+	// Legacy routes (deprecated; see Deprecation and Link response headers).
 	mux.HandleFunc("GET /{$}", h.NowUTC)
 	mux.HandleFunc("GET /epoch", h.Epoch)
-	// {tz...} captures multi-segment IANA names such as Europe/London.
 	mux.HandleFunc("GET /TZ/{tz...}", h.Timezone)
 
 	addr := ":" + port
