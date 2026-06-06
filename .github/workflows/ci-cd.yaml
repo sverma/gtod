@@ -91,6 +91,12 @@ jobs:
 
           service_account:
             ${{ secrets.GCP_SERVICE_ACCOUNT }}
+    
+      - name: Configure Docker Authentication
+        run: |
+          gcloud auth configure-docker \
+          ${{ secrets.GCP_REGION }}-docker.pkg.dev \
+          --quiet 
 
       - name: Setup gcloud
         uses: google-github-actions/setup-gcloud@v2
