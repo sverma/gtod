@@ -168,12 +168,9 @@ jobs:
       - name: Update Staging Image Tag
         run: |
 
-          cd applications/stage/worlddatetime
+          cd apps/worlddatetime/overlays/stage/
 
-          sed -i \
-          "s/newTag:.*/newTag: ${{
-          needs.z }}/" \
-          kustomization.yaml
+          sed -i "s/worlddatetime:.*/worlddatetime:${{ needs.build-sign-push.outputs.image_tag }}/" image.yaml
 
       - name: Commit And Push
         run: |
@@ -210,12 +207,9 @@ jobs:
       - name: Update Production Image Tag
         run: |
 
-          cd applications/production/worlddatetime
+          cd apps/worlddatetime/overlays/prod/
 
-          sed -i \
-          "s/newTag:.*/newTag: ${{
-          needs.build-sign-push.outputs.image_tag }}/" \
-          kustomization.yaml
+          sed -i "s/worlddatetime:.*/worlddatetime:${{ needs.build-sign-push.outputs.image_tag }}/" image.yaml
 
       - name: Commit And Push
         run: |
