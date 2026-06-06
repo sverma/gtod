@@ -120,3 +120,4 @@ Typical pipeline steps:
 4. Build and push a container image, then deploy via your GitOps tool (Argo CD, Flux, etc.)
 
 The service listens on `PORT` (default `8080`) and has no external dependencies beyond the Go standard library.
+..
