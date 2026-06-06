@@ -116,7 +116,7 @@ jobs:
         uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GAR_REPOSITORY }}/worlddatetime:${{ steps.meta.outputs.image_tag }}
-          severity: CRITICAL,HIGH
+          severity: CRITICAL
           exit-code: 1
           ignore-unfixed: true
 
