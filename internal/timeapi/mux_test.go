@@ -9,11 +9,29 @@ import (
 func newTestMux() *http.ServeMux {
 	h := newTestHandler()
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /time/difference", h.TimeDifference)
 	mux.HandleFunc("GET /time", h.Time)
 	mux.HandleFunc("GET /{$}", h.NowUTC)
 	mux.HandleFunc("GET /epoch", h.Epoch)
 	mux.HandleFunc("GET /TZ/{tz...}", h.Timezone)
 	return mux
+}
+
+func TestMuxTimeDifference(t *testing.T) {
+	mux := newTestMux()
+	req := httptest.NewRequest(http.MethodGet, "/time/difference?from=Europe/London&to=Asia/Tokyo", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body: %s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	var body timeDifferenceResponse
+	decodeBody(t, rec, &body)
+	if body.DifferenceSeconds != 28800 {
+		t.Errorf("difference_seconds = %d, want 28800", body.DifferenceSeconds)
+	}
 }
 
 func TestMuxTimeQueryTZ(t *testing.T) {

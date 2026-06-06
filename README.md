@@ -7,6 +7,7 @@ A minimal HTTP service for exercising CI/CD pipelines and GitOps delivery. It ex
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/time` | Current time (default: UTC, ISO-8601 / RFC3339) |
+| `GET` | `/time/difference` | UTC offset difference between two IANA timezones |
 
 ### Query parameters
 
@@ -44,6 +45,44 @@ curl -s "http://localhost:8080/time?format=unix&tz=Europe/London"
 ```
 
 Invalid `tz` or `format` values return `400` with `{"error":"..."}`.
+
+### `GET /time/difference`
+
+Compare two timezones at a single reference instant. Positive `difference_seconds` means `to` is ahead of `from`.
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `from` | yes | Source IANA timezone |
+| `to` | yes | Target IANA timezone |
+| `at` | no | Reference instant (RFC3339); defaults to now |
+
+```bash
+curl -s "http://localhost:8080/time/difference?from=Europe/London&to=Asia/Tokyo"
+```
+
+```json
+{
+  "reference_instant": "2026-06-03T14:30:45Z",
+  "from": {
+    "timezone": "Europe/London",
+    "datetime": "2026-06-03T15:30:45+01:00",
+    "utc_offset_seconds": 3600
+  },
+  "to": {
+    "timezone": "Asia/Tokyo",
+    "datetime": "2026-06-03T23:30:45+09:00",
+    "utc_offset_seconds": 32400
+  },
+  "difference_seconds": 28800,
+  "difference": "+8h"
+}
+```
+
+Historical comparison (DST-aware):
+
+```bash
+curl -s "http://localhost:8080/time/difference?from=America/New_York&to=Europe/London&at=2026-01-15T12:00:00Z"
+```
 
 ## Deprecated routes (backward compatible)
 

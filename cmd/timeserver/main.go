@@ -16,6 +16,7 @@ func main() {
 
 	h := timeapi.NewHandler()
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /time/difference", h.TimeDifference)
 	mux.HandleFunc("GET /time", h.Time)
 	// Legacy routes (deprecated; see Deprecation and Link response headers).
 	mux.HandleFunc("GET /{$}", h.NowUTC)
