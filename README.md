@@ -28,6 +28,8 @@ With `format=unix` (or `format=epoch`):
 {"datetime":"2026-06-03T14:30:45Z","timezone":"UTC","epoch":1748958645}
 ```
 
+When `WEATHER_SERVICE_URL` is set, `/time` and `/time/difference` also include a `weather` object fetched from the [weather service](../weather/) (`GET /weather?tz=...`). If the weather service is unavailable, time data is still returned without `weather`.
+
 ### Examples
 
 ```bash
@@ -41,10 +43,22 @@ curl -s "http://localhost:8080/time?tz=Asia/Tokyo"
 # {"datetime":"2026-06-03T23:30:45+09:00","timezone":"Asia/Tokyo"}
 
 curl -s "http://localhost:8080/time?format=unix&tz=Europe/London"
-# {"datetime":"...","timezone":"Europe/London","epoch":...}
+# {"datetime":"...","timezone":"Europe/London","epoch":...,"weather":{...}}
+
+# With weather service running on :8081
+WEATHER_SERVICE_URL=http://localhost:8081 ./bin/timeserver
+curl -s "http://localhost:8080/time?tz=Europe/London"
 ```
 
 Invalid `tz` or `format` values return `400` with `{"error":"..."}`.
+
+### Weather integration
+
+| Env var | Description |
+|---------|-------------|
+| `WEATHER_SERVICE_URL` | Base URL of the weather service, e.g. `http://localhost:8081` or `http://weather:8081` |
+
+gtod calls `GET {WEATHER_SERVICE_URL}/weather?tz={tz}&at={reference_instant}` and embeds the result in the response.
 
 ### `GET /time/difference`
 
@@ -66,12 +80,14 @@ curl -s "http://localhost:8080/time/difference?from=Europe/London&to=Asia/Tokyo"
   "from": {
     "timezone": "Europe/London",
     "datetime": "2026-06-03T15:30:45+01:00",
-    "utc_offset_seconds": 3600
+    "utc_offset_seconds": 3600,
+    "weather": { "...": "..." }
   },
   "to": {
     "timezone": "Asia/Tokyo",
     "datetime": "2026-06-03T23:30:45+09:00",
-    "utc_offset_seconds": 32400
+    "utc_offset_seconds": 32400,
+    "weather": { "...": "..." }
   },
   "difference_seconds": 28800,
   "difference": "+8h"
@@ -82,6 +98,50 @@ Historical comparison (DST-aware):
 
 ```bash
 curl -s "http://localhost:8080/time/difference?from=America/New_York&to=Europe/London&at=2026-01-15T12:00:00Z"
+```
+
+## Observability
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/metrics` | Prometheus metrics (RED + runtime + build info) |
+| `GET` | `/health` | Liveness probe (`{"status":"ok"}`) |
+| `GET` | `/ready` | Readiness probe (`{"status":"ready"}`) |
+
+### RED metrics
+
+| Metric | Type | Labels |
+|--------|------|--------|
+| `http_requests_total` | Counter | `method`, `route`, `status_class` (`2xx`, `4xx`, `5xx`) |
+| `http_request_errors_total` | Counter | `method`, `route`, `error_type` (`client`, `server`) |
+| `http_request_duration_seconds` | Histogram | `method`, `route` |
+| `http_requests_in_flight` | Gauge | — |
+
+### Application metrics
+
+| Metric | Type | Labels |
+|--------|------|--------|
+| `gtod_timezone_lookup_errors_total` | Counter | `reason` (`invalid_tz`, `missing_param`) |
+| `gtod_deprecated_route_requests_total` | Counter | `route` |
+| `gtod_build_info` | Gauge | `version`, `go_version`, `git_commit` |
+| `gtod_process_start_time_seconds` | Gauge | — |
+
+Go runtime and process metrics (`go_*`, `process_*`) are also exposed on `/metrics`.
+
+Set `VERSION` and `GIT_COMMIT` at deploy time so `gtod_build_info` identifies the running image in GitOps environments.
+
+```bash
+curl -s http://localhost:8080/metrics | head
+curl -s http://localhost:8080/health
+curl -s http://localhost:8080/ready
+```
+
+Example PromQL:
+
+```promql
+sum(rate(http_requests_total[5m])) by (route)
+rate(http_request_errors_total[5m]) / rate(http_requests_total[5m])
+histogram_quantile(0.95, sum by (le, route) (rate(http_request_duration_seconds_bucket[5m])))
 ```
 
 ## Deprecated routes (backward compatible)
@@ -143,8 +203,10 @@ go test ./internal/timeapi/... -v
 
 ```
 .
-├── cmd/timeserver/     # HTTP server entrypoint
-├── internal/timeapi/   # Handlers and clock abstraction
+├── cmd/timeserver/        # HTTP server entrypoint
+├── internal/timeapi/       # Handlers and clock abstraction
+├── internal/weatherclient/ # HTTP client for weather service
+├── internal/observability/ # Prometheus metrics, probes, middleware
 ├── go.mod
 └── README.md
 ```
@@ -158,5 +220,5 @@ Typical pipeline steps:
 3. `go build -o timeserver ./cmd/timeserver`
 4. Build and push a container image, then deploy via your GitOps tool (Argo CD, Flux, etc.)
 
-The service listens on `PORT` (default `8080`) and has no external dependencies beyond the Go standard library.
+The service listens on `PORT` (default `8080`). Runtime dependencies: [prometheus/client_golang](https://github.com/prometheus/client_golang) for `/metrics`.
   

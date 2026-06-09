@@ -1,16 +1,20 @@
 package timeapi
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
 	"time"
+
+	"gtod/internal/weatherclient"
 )
 
 type zoneSnapshot struct {
-	Timezone         string `json:"timezone"`
-	Datetime         string `json:"datetime"`
-	UTCOffsetSeconds int    `json:"utc_offset_seconds"`
+	Timezone         string                  `json:"timezone"`
+	Datetime         string                  `json:"datetime"`
+	UTCOffsetSeconds int                     `json:"utc_offset_seconds"`
+	Weather          *weatherclient.Forecast `json:"weather,omitempty"`
 }
 
 type timeDifferenceResponse struct {
@@ -39,6 +43,7 @@ func (h *Handler) TimeDifference(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, errMsg)
 		return
 	}
+	h.enrichDifferenceWeather(r.Context(), &resp)
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -54,11 +59,13 @@ func (h *Handler) buildTimeDifference(from, to, at string) (timeDifferenceRespon
 
 	fromLoc, fromName, errMsg, status := resolveNamedLocation(from)
 	if errMsg != "" {
+		h.recordTimezoneErrorFromMessage(errMsg)
 		return timeDifferenceResponse{}, errMsg, status
 	}
 
 	toLoc, toName, errMsg, status := resolveNamedLocation(to)
 	if errMsg != "" {
+		h.recordTimezoneErrorFromMessage(errMsg)
 		return timeDifferenceResponse{}, errMsg, status
 	}
 
@@ -73,6 +80,15 @@ func (h *Handler) buildTimeDifference(from, to, at string) (timeDifferenceRespon
 		DifferenceSeconds: diff,
 		Difference:        formatDifference(diff),
 	}, "", http.StatusOK
+}
+
+func (h *Handler) enrichDifferenceWeather(ctx context.Context, resp *timeDifferenceResponse) {
+	instant, err := time.Parse(time.RFC3339, resp.ReferenceInstant)
+	if err != nil {
+		return
+	}
+	resp.From.Weather = h.lookupWeather(ctx, resp.From.Timezone, instant)
+	resp.To.Weather = h.lookupWeather(ctx, resp.To.Timezone, instant)
 }
 
 func parseReferenceInstant(at string, clock Clock) (time.Time, string, int) {
