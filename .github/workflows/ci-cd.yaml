@@ -190,6 +190,7 @@ jobs:
 
     needs:
       - deploy-staging
+      - build-sign-push
 
     runs-on: ubuntu-latest
 

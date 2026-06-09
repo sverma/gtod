@@ -221,3 +221,4 @@ Typical pipeline steps:
 4. Build and push a container image, then deploy via your GitOps tool (Argo CD, Flux, etc.)
 
 The service listens on `PORT` (default `8080`). Runtime dependencies: [prometheus/client_golang](https://github.com/prometheus/client_golang) for `/metrics`.
+
