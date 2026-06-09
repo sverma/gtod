@@ -25,8 +25,8 @@ func (s stubWeatherClient) Lookup(_ context.Context, tz, _ string) (weatherclien
 func TestTimeIncludesWeather(t *testing.T) {
 	h := newTestHandler().WithWeatherClient(stubWeatherClient{
 		forecast: weatherclient.Forecast{
-			Location: "London",
-			Provider: "stub",
+			Location:   "London",
+			Provider:   "stub",
 			Conditions: weatherclient.Conditions{Summary: "Sunny"},
 		},
 	})

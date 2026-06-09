@@ -29,10 +29,10 @@ func NewHandlerWithClock(clock Clock) *Handler {
 
 // timeResponse is the unified JSON body for GET /time and legacy routes.
 type timeResponse struct {
-	Datetime string                   `json:"datetime"`
-	Timezone string                   `json:"timezone"`
-	Epoch    *int64                   `json:"epoch,omitempty"`
-	Weather  *weatherclient.Forecast  `json:"weather,omitempty"`
+	Datetime string                  `json:"datetime"`
+	Timezone string                  `json:"timezone"`
+	Epoch    *int64                  `json:"epoch,omitempty"`
+	Weather  *weatherclient.Forecast `json:"weather,omitempty"`
 }
 
 type errorResponse struct {
