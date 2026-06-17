@@ -1,0 +1,115 @@
+name: reusable-build-sign
+
+# Reusable workflow: turn source into a trusted, immutable artifact.
+#   push=false (PRs)  -> build + load locally + Trivy scan only. No registry, no signing.
+#   push=true (main)  -> build + push by digest to Artifact Registry,
+#                        Trivy scan, BuildKit SBOM + provenance attestations,
+#                        keyless Cosign signature, and a GitHub SLSA provenance attestation.
+
+on:
+  workflow_call:
+    inputs:
+      push:
+        description: Push, scan and sign the image (true on release, false on PRs)
+        type: boolean
+        default: false
+      image-tag:
+        description: Tag to apply to the image
+        type: string
+        required: true
+    outputs:
+      image:
+        description: Fully-qualified image repository (no tag)
+        value: ${{ jobs.build.outputs.image }}
+      digest:
+        description: Immutable image digest (sha256:...)
+        value: ${{ jobs.build.outputs.digest }}
+
+permissions:
+  contents: read
+
+env:
+  IMAGE_NAME: worlddatetime
+
+jobs:
+  build:
+    name: build / scan / sign
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # GCP Workload Identity + keyless Cosign + provenance attestation
+      attestations: write # actions/attest-build-provenance writes to the attestations API
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Authenticate to GCP (OIDC, no static keys)
+        if: ${{ inputs.push }}
+        uses: google-github-actions/auth@c200f3691d83b41bf9bbd8638997a462592937ed # v2
+        with:
+          workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Setup gcloud
+        if: ${{ inputs.push }}
+        uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
+
+      - name: Configure Docker auth for Artifact Registry
+        if: ${{ inputs.push }}
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: Compute image reference
+        id: meta
+        run: |
+          if [ "${{ inputs.push }}" = "true" ]; then
+            echo "image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GAR_REPOSITORY }}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          else
+            echo "image=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build (and push on release)
+        id: build
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: ${{ inputs.push }}
+          load: ${{ !inputs.push }}
+          tags: ${{ steps.meta.outputs.image }}:${{ inputs.image-tag }}
+          provenance: ${{ inputs.push && 'mode=max' || 'false' }}
+          sbom: ${{ inputs.push }}
+
+      - name: Registry credentials for Trivy
+        if: ${{ inputs.push }}
+        run: |
+          echo "TRIVY_USERNAME=oauth2accesstoken" >> "$GITHUB_ENV"
+          echo "TRIVY_PASSWORD=$(gcloud auth print-access-token)" >> "$GITHUB_ENV"
+
+      - name: Trivy image scan (blocking on CRITICAL)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ${{ inputs.push && format('{0}@{1}', steps.meta.outputs.image, steps.build.outputs.digest) || format('{0}:{1}', steps.meta.outputs.image, inputs.image-tag) }}
+          severity: CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+
+      - name: Install Cosign
+        if: ${{ inputs.push }}
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      - name: Cosign sign image (keyless / Sigstore)
+        if: ${{ inputs.push }}
+        run: cosign sign --yes "${{ steps.meta.outputs.image }}@${{ steps.build.outputs.digest }}"
+
+      - name: Attest SLSA build provenance
+        if: ${{ inputs.push }}
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-name: ${{ steps.meta.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
