@@ -1,35 +1,51 @@
 name: reusable-build-sign
 
-# Reusable workflow: turn source into a trusted, immutable artifact.
-#   push=false (PRs)  -> build + load locally + Trivy scan only. No registry, no signing.
-#   push=true (main)  -> build + push by digest to Artifact Registry,
-#                        Trivy scan, BuildKit SBOM + provenance attestations,
-#                        keyless Cosign signature, and a GitHub SLSA provenance attestation.
+# Shared workflow: turn source into a trusted, immutable container artifact.
 
 on:
   workflow_call:
     inputs:
       push:
-        description: Push, scan and sign the image (true on release, false on PRs)
+        description: Push, scan and sign the image.
         type: boolean
         default: false
-      image-tag:
-        description: Tag to apply to the image
+      image-name:
+        description: Container image name inside the Artifact Registry repository.
         type: string
         required: true
+      image-tag:
+        description: Tag to apply to the image.
+        type: string
+        required: true
+      build-context:
+        description: Docker build context.
+        type: string
+        default: "."
+      dockerfile:
+        description: Dockerfile path.
+        type: string
+        default: "Dockerfile"
+    secrets:
+      WORKLOAD_IDENTITY_PROVIDER:
+        required: false
+      GCP_SERVICE_ACCOUNT:
+        required: false
+      GCP_REGION:
+        required: false
+      GCP_PROJECT_ID:
+        required: false
+      GAR_REPOSITORY:
+        required: false
     outputs:
       image:
-        description: Fully-qualified image repository (no tag)
+        description: Fully-qualified image repository without tag.
         value: ${{ jobs.build.outputs.image }}
       digest:
-        description: Immutable image digest (sha256:...)
+        description: Immutable image digest.
         value: ${{ jobs.build.outputs.digest }}
 
 permissions:
   contents: read
-
-env:
-  IMAGE_NAME: worlddatetime
 
 jobs:
   build:
@@ -37,8 +53,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # GCP Workload Identity + keyless Cosign + provenance attestation
-      attestations: write # actions/attest-build-provenance writes to the attestations API
+      id-token: write
+      attestations: write
     outputs:
       image: ${{ steps.meta.outputs.image }}
       digest: ${{ steps.build.outputs.digest }}
@@ -57,23 +73,17 @@ jobs:
         if: ${{ inputs.push }}
         uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
 
-      - name: Log in to Artifact Registry
+      - name: Configure Docker auth for Artifact Registry
         if: ${{ inputs.push }}
-        # Static `docker login` (not `gcloud auth configure-docker`): the latter only
-        # writes a credential helper, which buildx understands but the attest action
-        # does not, causing "No credentials found for registry" when pushing the
-        # provenance attestation. A real login writes an `auths` entry both can read.
-        run: |
-          gcloud auth print-access-token \
-            | docker login -u oauth2accesstoken --password-stdin "${{ secrets.GCP_REGION }}-docker.pkg.dev"
+        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
 
       - name: Compute image reference
         id: meta
         run: |
           if [ "${{ inputs.push }}" = "true" ]; then
-            echo "image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GAR_REPOSITORY }}/${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+            echo "image=${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.GAR_REPOSITORY }}/${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
           else
-            echo "image=${IMAGE_NAME}" >> "$GITHUB_OUTPUT"
+            echo "image=${{ inputs.image-name }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up Buildx
@@ -83,7 +93,8 @@ jobs:
         id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: .
+          context: ${{ inputs.build-context }}
+          file: ${{ inputs.dockerfile }}
           push: ${{ inputs.push }}
           load: ${{ !inputs.push }}
           tags: ${{ steps.meta.outputs.image }}:${{ inputs.image-tag }}
