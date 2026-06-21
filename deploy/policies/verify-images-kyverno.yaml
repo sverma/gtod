@@ -1,0 +1,38 @@
+# Kyverno ClusterPolicy: reject any worlddatetime image that was not built and
+# signed by THIS repo's GitHub Actions workflows (keyless Cosign / Sigstore).
+#
+# This is the control that makes signing actually enforce something: without an
+# admission policy like this, a Cosign signature is just metadata. Apply it to
+# the cluster (via your GitOps repo) AFTER Kyverno is installed.
+#
+# Docs: https://kyverno.io/docs/policy-types/cluster-policy/verify-images/
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-worlddatetime-image
+spec:
+  validationFailureAction: Enforce # change to Audit first to dry-run in a cluster
+  background: false
+  webhookTimeoutSeconds: 30
+  rules:
+    - name: verify-cosign-keyless-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "*-docker.pkg.dev/*/*/worlddatetime*"
+          mutateDigest: true # rewrite tag -> digest so the verified image is the one that runs
+          required: true
+          attestors:
+            - count: 1
+              entries:
+                - keyless:
+                    # Identity of the signer = the GitHub Actions workflow that ran cosign.
+                    # Tighten the wildcard to your exact repo once stable.
+                    subject: "https://github.com/sverma/gtod/.github/workflows/*"
+                    issuer: "https://token.actions.githubusercontent.com"
+                    rekor:
+                      url: https://rekor.sigstore.dev

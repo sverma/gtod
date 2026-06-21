@@ -1,0 +1,35 @@
+name: pr-validation
+
+# Runs on every pull request. Pure "is this safe to merge?" gate.
+# It NEVER pushes an image, never touches a cluster, never deploys.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  ci-checks:
+    name: ci-checks
+    uses: ./.github/workflows/reusable-ci-checks.yaml
+    permissions:
+      contents: read
+      security-events: write
+
+  build-only:
+    name: build-only
+    uses: ./.github/workflows/reusable-build-sign.yaml
+    permissions:
+      contents: read
+      id-token: write # parity with the reusable build job; signing steps are skipped on PRs
+      attestations: write
+    with:
+      push: false
+      image-tag: pr-${{ github.event.pull_request.number }}
+    secrets: inherit
