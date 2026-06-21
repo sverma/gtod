@@ -23,7 +23,7 @@ permissions:
 jobs:
   promote:
     name: promote
-    uses: sverma/platform-workflows/.github/workflows/reusable-promote.yaml@v1.0.5
+    uses: sverma/platform-workflows/.github/workflows/reusable-promote.yaml@v1.0.6
     permissions:
       contents: read
       id-token: write
