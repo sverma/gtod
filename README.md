@@ -28,7 +28,15 @@ With `format=unix` (or `format=epoch`):
 {"datetime":"2026-06-03T14:30:45Z","timezone":"UTC","epoch":1748958645}
 ```
 
-When `WEATHER_SERVICE_URL` is set, `/time` and `/time/difference` also include a `weather` object fetched from the [weather service](../weather/) (`GET /weather?tz=...`). If the weather service is unavailable, time data is still returned without `weather`.
+When `WEATHER_SERVICE_URL` is set, `/time` and `/time/difference` also include weather data from the [weather service](../weather/) (`GET /weather?tz=...`):
+
+| Field | Values | Meaning |
+|-------|--------|---------|
+| `weather_status` | `ok` | Weather service returned data |
+| `weather_status` | `unavailable` | Weather service configured but call failed |
+| `weather` | object | Present when `weather_status` is `ok` |
+
+When `WEATHER_SERVICE_URL` is not set, neither `weather_status` nor `weather` is included.
 
 ### Examples
 
@@ -81,12 +89,14 @@ curl -s "http://localhost:8080/time/difference?from=Europe/London&to=Asia/Tokyo"
     "timezone": "Europe/London",
     "datetime": "2026-06-03T15:30:45+01:00",
     "utc_offset_seconds": 3600,
+    "weather_status": "ok",
     "weather": { "...": "..." }
   },
   "to": {
     "timezone": "Asia/Tokyo",
     "datetime": "2026-06-03T23:30:45+09:00",
     "utc_offset_seconds": 32400,
+    "weather_status": "ok",
     "weather": { "...": "..." }
   },
   "difference_seconds": 28800,

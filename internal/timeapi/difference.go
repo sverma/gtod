@@ -14,6 +14,7 @@ type zoneSnapshot struct {
 	Timezone         string                  `json:"timezone"`
 	Datetime         string                  `json:"datetime"`
 	UTCOffsetSeconds int                     `json:"utc_offset_seconds"`
+	WeatherStatus    string                  `json:"weather_status,omitempty"`
 	Weather          *weatherclient.Forecast `json:"weather,omitempty"`
 }
 
@@ -87,8 +88,13 @@ func (h *Handler) enrichDifferenceWeather(ctx context.Context, resp *timeDiffere
 	if err != nil {
 		return
 	}
-	resp.From.Weather = h.lookupWeather(ctx, resp.From.Timezone, instant)
-	resp.To.Weather = h.lookupWeather(ctx, resp.To.Timezone, instant)
+	fromWeather := h.fetchWeather(ctx, resp.From.Timezone, instant)
+	resp.From.WeatherStatus = fromWeather.status
+	resp.From.Weather = fromWeather.forecast
+
+	toWeather := h.fetchWeather(ctx, resp.To.Timezone, instant)
+	resp.To.WeatherStatus = toWeather.status
+	resp.To.Weather = toWeather.forecast
 }
 
 func parseReferenceInstant(at string, clock Clock) (time.Time, string, int) {

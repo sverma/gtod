@@ -1,7 +1,6 @@
 package timeapi
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -29,10 +28,11 @@ func NewHandlerWithClock(clock Clock) *Handler {
 
 // timeResponse is the unified JSON body for GET /time and legacy routes.
 type timeResponse struct {
-	Datetime string                  `json:"datetime"`
-	Timezone string                  `json:"timezone"`
-	Epoch    *int64                  `json:"epoch,omitempty"`
-	Weather  *weatherclient.Forecast `json:"weather,omitempty"`
+	Datetime      string                  `json:"datetime"`
+	Timezone      string                  `json:"timezone"`
+	Epoch         *int64                  `json:"epoch,omitempty"`
+	WeatherStatus string                  `json:"weather_status,omitempty"`
+	Weather       *weatherclient.Forecast `json:"weather,omitempty"`
 }
 
 type errorResponse struct {
@@ -53,7 +53,9 @@ func (h *Handler) Time(w http.ResponseWriter, r *http.Request) {
 		writeError(w, status, errMsg)
 		return
 	}
-	resp.Weather = h.lookupWeather(r.Context(), resp.Timezone, h.clock.Now().UTC())
+	weather := h.fetchWeather(r.Context(), resp.Timezone, h.clock.Now().UTC())
+	resp.WeatherStatus = weather.status
+	resp.Weather = weather.forecast
 	writeJSON(w, http.StatusOK, resp)
 }
 
@@ -175,15 +177,4 @@ func (h *Handler) recordTimezoneErrorFromMessage(message string) {
 	if strings.Contains(message, "timezone is required") {
 		h.recordTimezoneError("missing_param")
 	}
-}
-
-func (h *Handler) lookupWeather(ctx context.Context, tz string, at time.Time) *weatherclient.Forecast {
-	if h.weather == nil || !h.weather.Enabled() {
-		return nil
-	}
-	forecast, err := h.weather.Lookup(ctx, tz, at.UTC().Format(time.RFC3339))
-	if err != nil {
-		return nil
-	}
-	return &forecast
 }
