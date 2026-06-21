@@ -16,7 +16,7 @@ permissions:
 jobs:
   release:
     name: release
-    uses: sverma/platform-workflows/.github/workflows/reusable-release.yaml@v1.0.8
+    uses: sverma/platform-workflows/.github/workflows/reusable-release.yaml@v1.0.9
     permissions:
       contents: read
       id-token: write
@@ -30,6 +30,7 @@ jobs:
       staging-overlay: stage
       staging-environment: staging
       go-version: "1.24"
+      coverage-threshold: 80
       build-context: "."
       dockerfile: Dockerfile
     secrets:
