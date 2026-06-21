@@ -57,9 +57,15 @@ jobs:
         if: ${{ inputs.push }}
         uses: google-github-actions/setup-gcloud@e427ad8a34f8676edf47cf7d7925499adf3eb74f # v2
 
-      - name: Configure Docker auth for Artifact Registry
+      - name: Log in to Artifact Registry
         if: ${{ inputs.push }}
-        run: gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+        # Static `docker login` (not `gcloud auth configure-docker`): the latter only
+        # writes a credential helper, which buildx understands but the attest action
+        # does not, causing "No credentials found for registry" when pushing the
+        # provenance attestation. A real login writes an `auths` entry both can read.
+        run: |
+          gcloud auth print-access-token \
+            | docker login -u oauth2accesstoken --password-stdin "${{ secrets.GCP_REGION }}-docker.pkg.dev"
 
       - name: Compute image reference
         id: meta
