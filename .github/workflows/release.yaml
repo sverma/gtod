@@ -16,7 +16,7 @@ permissions:
 jobs:
   release:
     name: release
-    uses: sverma/platform-workflows/.github/workflows/reusable-release.yaml@v1.0.2
+    uses: sverma/platform-workflows/.github/workflows/reusable-release.yaml@v1.0.3
     permissions:
       contents: read
       id-token: write
