@@ -3,6 +3,7 @@ package timeapi
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,6 +21,14 @@ func (s stubWeatherClient) Lookup(_ context.Context, tz, _ string) (weatherclien
 	f := s.forecast
 	f.Timezone = tz
 	return f, nil
+}
+
+type failingWeatherClient struct{}
+
+func (failingWeatherClient) Enabled() bool { return true }
+
+func (failingWeatherClient) Lookup(context.Context, string, string) (weatherclient.Forecast, error) {
+	return weatherclient.Forecast{}, errors.New("weather unavailable")
 }
 
 func TestTimeIncludesWeather(t *testing.T) {
@@ -45,6 +54,9 @@ func TestTimeIncludesWeather(t *testing.T) {
 	if body.Weather.Location != "London" {
 		t.Errorf("weather.location = %q", body.Weather.Location)
 	}
+	if body.WeatherStatus != WeatherStatusOK {
+		t.Errorf("weather_status = %q, want %q", body.WeatherStatus, WeatherStatusOK)
+	}
 }
 
 func TestTimeDifferenceIncludesWeather(t *testing.T) {
@@ -69,6 +81,9 @@ func TestTimeDifferenceIncludesWeather(t *testing.T) {
 	if body.To.Weather.Timezone != "Asia/Tokyo" {
 		t.Errorf("to weather tz = %q", body.To.Weather.Timezone)
 	}
+	if body.From.WeatherStatus != WeatherStatusOK || body.To.WeatherStatus != WeatherStatusOK {
+		t.Errorf("weather_status from=%q to=%q", body.From.WeatherStatus, body.To.WeatherStatus)
+	}
 }
 
 func TestTimeOmitsWeatherWhenClientDisabled(t *testing.T) {
@@ -81,6 +96,25 @@ func TestTimeOmitsWeatherWhenClientDisabled(t *testing.T) {
 	decodeBody(t, rec, &body)
 	if body.Weather != nil {
 		t.Fatal("expected no weather without client")
+	}
+	if body.WeatherStatus != "" {
+		t.Fatalf("weather_status = %q, want omitted", body.WeatherStatus)
+	}
+}
+
+func TestTimeWeatherStatusUnavailable(t *testing.T) {
+	h := newTestHandler().WithWeatherClient(failingWeatherClient{})
+	req := httptest.NewRequest(http.MethodGet, "/time?tz=UTC", nil)
+	rec := httptest.NewRecorder()
+	h.Time(rec, req)
+
+	var body timeResponse
+	decodeBody(t, rec, &body)
+	if body.WeatherStatus != WeatherStatusUnavailable {
+		t.Fatalf("weather_status = %q, want %q", body.WeatherStatus, WeatherStatusUnavailable)
+	}
+	if body.Weather != nil {
+		t.Fatal("expected no weather payload when unavailable")
 	}
 }
 
@@ -103,5 +137,8 @@ func TestTimeIntegrationWithWeatherServer(t *testing.T) {
 	decodeBody(t, rec, &body)
 	if body.Weather == nil || body.Weather.Location != "Test City" {
 		t.Fatalf("weather = %+v", body.Weather)
+	}
+	if body.WeatherStatus != WeatherStatusOK {
+		t.Errorf("weather_status = %q, want %q", body.WeatherStatus, WeatherStatusOK)
 	}
 }
