@@ -1,7 +1,7 @@
 name: pr-validation
 
-# Runs on every pull request. Pure "is this safe to merge?" gate.
-# It NEVER pushes an image, never touches a cluster, never deploys.
+# Thin service wrapper. Shared CI/build-only logic lives in:
+# sverma/platform-workflows/.github/workflows/
 
 on:
   pull_request:
@@ -17,19 +17,21 @@ concurrency:
 jobs:
   ci-checks:
     name: ci-checks
-    uses: ./.github/workflows/reusable-ci-checks.yaml
+    uses: sverma/platform-workflows/.github/workflows/reusable-ci-checks.yaml@v1.0.1
     permissions:
       contents: read
       security-events: write
+    with:
+      go-version: "1.24"
 
   build-only:
     name: build-only
-    uses: ./.github/workflows/reusable-build-sign.yaml
+    uses: sverma/platform-workflows/.github/workflows/reusable-build-sign.yaml@v1.0.1
     permissions:
       contents: read
-      id-token: write # parity with the reusable build job; signing steps are skipped on PRs
+      id-token: write
       attestations: write
     with:
       push: false
+      image-name: worlddatetime
       image-tag: pr-${{ github.event.pull_request.number }}
-    secrets: inherit
