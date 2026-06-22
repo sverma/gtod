@@ -27,7 +27,7 @@ permissions:
 jobs:
   rollback:
     name: rollback
-    uses: sverma/platform-workflows/.github/workflows/reusable-rollback.yaml@v1.1.0
+    uses: sverma/platform-workflows/.github/workflows/reusable-rollback.yaml@v1.2.0
     permissions:
       contents: read
       id-token: write
