@@ -23,7 +23,7 @@ permissions:
 jobs:
   release:
     name: release
-    uses: sverma/platform-workflows/.github/workflows/reusable-release.yaml@v1.1.0
+    uses: sverma/platform-workflows/.github/workflows/reusable-release.yaml@codex/gitops-validation-pass1
     permissions:
       contents: read
       id-token: write
