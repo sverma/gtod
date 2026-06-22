@@ -1,0 +1,52 @@
+name: rollback-production
+
+# Thin service wrapper. Shared rollback logic lives in:
+# sverma/platform-workflows/.github/workflows/reusable-rollback.yaml
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: Image tag to roll back to (e.g. v0.0.0-abc1234)
+        required: true
+        type: string
+      image_digest:
+        description: Image digest to roll back to (sha256:...)
+        required: true
+        type: string
+      reason:
+        description: Why rollback is needed
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: read
+
+jobs:
+  rollback:
+    name: rollback
+    uses: sverma/platform-workflows/.github/workflows/reusable-rollback.yaml@codex-rollback-workflow-v2
+    permissions:
+      contents: read
+      id-token: write
+      attestations: read
+    with:
+      service-name: worlddatetime
+      image-name: worlddatetime
+      container-name: worlddatetime
+      gitops-app-path: apps/worlddatetime
+      production-overlay: prod
+      production-environment: production
+      image-tag: ${{ inputs.image_tag }}
+      image-digest: ${{ inputs.image_digest }}
+      reason: ${{ inputs.reason }}
+    secrets:
+      WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
+      GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GAR_REPOSITORY: ${{ secrets.GAR_REPOSITORY }}
+      GITOPS_REPO: ${{ secrets.GITOPS_REPO }}
+      GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
