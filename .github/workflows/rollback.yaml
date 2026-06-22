@@ -1,17 +1,21 @@
-name: promote-production
+name: rollback-production
 
-# Thin service wrapper. Shared promotion logic lives in:
-# sverma/platform-workflows/.github/workflows/reusable-promote.yaml
+# Thin service wrapper. Shared rollback logic lives in:
+# sverma/platform-workflows/.github/workflows/reusable-rollback.yaml
 
 on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: Image tag to promote (e.g. v0.0.0-abc1234)
+        description: Image tag to roll back to (e.g. v0.0.0-abc1234)
         required: true
         type: string
       image_digest:
-        description: Image digest of the staged image (sha256:...)
+        description: Image digest to roll back to (sha256:...)
+        required: true
+        type: string
+      reason:
+        description: Why rollback is needed
         required: true
         type: string
 
@@ -21,25 +25,28 @@ permissions:
   attestations: read
 
 jobs:
-  promote:
-    name: promote
-    uses: sverma/platform-workflows/.github/workflows/reusable-promote.yaml@v1.1.0
+  rollback:
+    name: rollback
+    uses: sverma/platform-workflows/.github/workflows/reusable-rollback.yaml@v1.1.0
     permissions:
       contents: read
       id-token: write
       attestations: read
     with:
       service-name: worlddatetime
+      image-name: worlddatetime
       container-name: worlddatetime
       gitops-app-path: apps/worlddatetime
-      staging-overlay: stage
       production-overlay: prod
       production-environment: production
       image-tag: ${{ inputs.image_tag }}
       image-digest: ${{ inputs.image_digest }}
+      reason: ${{ inputs.reason }}
     secrets:
       WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       GCP_REGION: ${{ secrets.GCP_REGION }}
+      GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      GAR_REPOSITORY: ${{ secrets.GAR_REPOSITORY }}
       GITOPS_REPO: ${{ secrets.GITOPS_REPO }}
       GITOPS_PAT: ${{ secrets.GITOPS_PAT }}
