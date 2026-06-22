@@ -7,6 +7,7 @@ A minimal HTTP service for exercising CI/CD pipelines and GitOps delivery. It ex
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/time` | Current time (default: UTC, ISO-8601 / RFC3339) |
+| `GET` | `/time/convert` | Express one instant in two IANA timezones |
 | `GET` | `/time/difference` | UTC offset difference between two IANA timezones |
 
 ### Query parameters
@@ -67,6 +68,28 @@ Invalid `tz` or `format` values return `400` with `{"error":"..."}`.
 | `WEATHER_SERVICE_URL` | Base URL of the weather service, e.g. `http://localhost:8081` or `http://weather:8081` |
 
 gtod calls `GET {WEATHER_SERVICE_URL}/weather?tz={tz}&at={reference_instant}` and embeds the result in the response.
+
+### `GET /time/convert`
+
+Express a single instant in two timezones (same moment, different wall clocks).
+
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `to` | yes | Target IANA timezone |
+| `from` | no | Source IANA timezone (default `UTC`) |
+| `at` | no | Instant to convert (RFC3339); defaults to now |
+
+```bash
+curl -s "http://localhost:8080/time/convert?from=UTC&to=Europe/London&at=2026-06-03T14:30:45Z"
+```
+
+```json
+{
+  "instant": "2026-06-03T14:30:45Z",
+  "from": {"timezone": "UTC", "datetime": "2026-06-03T14:30:45Z"},
+  "to": {"timezone": "Europe/London", "datetime": "2026-06-03T15:30:45+01:00"}
+}
+```
 
 ### `GET /time/difference`
 

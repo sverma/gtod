@@ -8,6 +8,7 @@ import (
 // Route name constants for low-cardinality metric labels.
 const (
 	RouteTime           = "/time"
+	RouteTimeConvert    = "/time/convert"
 	RouteTimeDifference = "/time/difference"
 	RouteRoot           = "/"
 	RouteEpoch          = "/epoch"

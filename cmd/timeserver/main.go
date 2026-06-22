@@ -29,6 +29,7 @@ func main() {
 	}))
 	mux.HandleFunc("GET /health", metrics.Instrument(observability.RouteHealth, observability.HealthHandler))
 	mux.HandleFunc("GET /ready", metrics.Instrument(observability.RouteReady, observability.ReadyHandler))
+	mux.HandleFunc("GET /time/convert", metrics.Instrument(observability.RouteTimeConvert, h.TimeConvert))
 	mux.HandleFunc("GET /time/difference", metrics.Instrument(observability.RouteTimeDifference, h.TimeDifference))
 	mux.HandleFunc("GET /time", metrics.Instrument(observability.RouteTime, h.Time))
 	// Legacy routes (deprecated; see Deprecation and Link response headers).
