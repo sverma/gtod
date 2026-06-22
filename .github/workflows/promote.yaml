@@ -23,7 +23,7 @@ permissions:
 jobs:
   promote:
     name: promote
-    uses: sverma/platform-workflows/.github/workflows/reusable-promote.yaml@v1.2.0
+    uses: sverma/platform-workflows/.github/workflows/reusable-promote.yaml@codex/gitops-policy-pass2
     permissions:
       contents: read
       id-token: write
